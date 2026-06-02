@@ -1,0 +1,82 @@
+name: Build and release cri-shim
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-and-release:
+    name: Build cri-shim binary and publish release
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generate version tag
+        id: tag
+        run: echo "tag=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+
+      - name: Build cri-shim (amd64 + arm64)
+        run: |
+          mkdir -p release
+          TAG=${{ steps.tag.outputs.tag }}
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-s -w" -o release/cri-shim-${TAG}-linux-amd64 ./cmd/main.go
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags "-s -w" -o release/cri-shim-${TAG}-linux-arm64 ./cmd/main.go
+          cp release/cri-shim-${TAG}-linux-amd64 release/cri-shim-latest-linux-amd64
+          cp release/cri-shim-${TAG}-linux-arm64 release/cri-shim-latest-linux-arm64
+
+      - name: Generate release notes
+        run: |
+          cat > release-notes.md <<EOF
+          ## Changes
+
+          - **feat**: \`--commit-timeout\` flag (default 20 min)
+          - **fix**: \`--certs-dir\` flag (default \`/etc/containerd/certs.d\`) — 修复 GetResolver 未设置 HostDir 导致 hosts.toml/harbor mirror 从未被读取的问题
+          - **ci**: GitHub Actions workflow 自动构建 amd64/arm64 二进制并发版
+          - **chore**: 更新 systemd service 文件，添加 RuntimeDirectory、新启动参数
+
+          ## Binaries
+
+          | File | Arch |
+          |------|------|
+          | \`cri-shim-${{ steps.tag.outputs.tag }}-linux-amd64\` | x86_64 |
+          | \`cri-shim-${{ steps.tag.outputs.tag }}-linux-arm64\` | ARM64 |
+
+          ## Usage
+
+          \`\`\`bash
+          wget https://github.com/vlee0203/cri-shim/releases/latest/download/cri-shim-latest-linux-amd64
+          chmod +x cri-shim-latest-linux-amd64
+          mv cri-shim-latest-linux-amd64 /usr/bin/cri-shim
+          cri-shim server --help
+          \`\`\`
+          EOF
+
+      - name: Create releases
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          TAG=${{ steps.tag.outputs.tag }}
+
+          # 1. Create commit release (permanent)
+          gh release create "$TAG" \
+            release/cri-shim-${TAG}-linux-amd64 \
+            release/cri-shim-${TAG}-linux-arm64 \
+            --title "cri-shim $TAG" \
+            --target main \
+            --notes-file release-notes.md
+
+          # 2. Update latest release (delete old + recreate)
+          gh release delete latest --yes || true
+          gh api repos/${{ github.repository }}/git/refs/tags/latest -X DELETE || true
+          gh release create latest \
+            release/cri-shim-latest-linux-amd64 \
+            release/cri-shim-latest-linux-arm64 \
+            --title "cri-shim latest" \
+            --latest \
+            --target main \
+            --notes-file release-notes.md

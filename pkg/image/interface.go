@@ -42,12 +42,13 @@ type imageInterfaceImpl struct {
 
 	Client       *client.Client
 	SquashClient *runtime.Runtime
+	CertsDir     string
 }
 
 // NewImageInterface returns a new implementation of ImageInterface
 // address: the address of the container runtime
 // writer: the io.Writer for output
-func NewImageInterface(namespace, address, root string, fStdout *os.File) (ImageInterface, error) {
+func NewImageInterface(namespace, address, root, certsDir string, fStdout *os.File) (ImageInterface, error) {
 	global := types.GlobalCommandOptions{
 		Namespace:        namespace,
 		Address:          address,
@@ -58,6 +59,7 @@ func NewImageInterface(namespace, address, root string, fStdout *os.File) (Image
 		GlobalOptions: global,
 		Stdout:        fStdout,
 		FStdout:       fStdout,
+		CertsDir:      certsDir,
 	}
 	var err error
 	if impl.Client, _, impl.Cancel, err = clientutil.NewClient(context.Background(), global.Namespace, global.Address); err != nil {
@@ -123,7 +125,7 @@ func (impl *imageInterfaceImpl) Remove(ctx context.Context, args string, force, 
 // args: the list of images
 func (impl *imageInterfaceImpl) Push(ctx context.Context, args, username, password string) error {
 	//set resolver
-	resolver, err := GetResolver(ctx, username, password)
+	resolver, err := GetResolver(ctx, username, password, impl.CertsDir)
 	if err != nil {
 		slog.Error("failed to set resolver", "Image", args, "Error", err)
 		return err
@@ -147,7 +149,7 @@ func (impl *imageInterfaceImpl) Push(ctx context.Context, args, username, passwo
 	return nil
 }
 
-func GetResolver(ctx context.Context, username string, secret string) (remotes.Resolver, error) {
+func GetResolver(ctx context.Context, username string, secret string, certsDir string) (remotes.Resolver, error) {
 	resolverOptions := docker.ResolverOptions{
 		Tracker: docker.NewInMemoryTracker(),
 	}
@@ -159,6 +161,9 @@ func GetResolver(ctx context.Context, username string, secret string) (remotes.R
 		hostOptions.Credentials = func(host string) (string, string, error) {
 			return username, secret, nil
 		}
+	}
+	if certsDir != "" {
+		hostOptions.HostDir = config.HostDirFromRoot(certsDir)
 	}
 	hostOptions.DefaultScheme = "http"
 	hostOptions.DefaultTLS = nil
@@ -212,7 +217,7 @@ func (impl *imageInterfaceImpl) Squash(ctx context.Context, SourceImageRef, Targ
 func (impl *imageInterfaceImpl) Pull(ctx context.Context, args, username, password string) error {
 
 	//set resolver
-	resolver, err := GetResolver(ctx, username, password)
+	resolver, err := GetResolver(ctx, username, password, impl.CertsDir)
 	if err != nil {
 		slog.Error("failed to set resolver", "Image", args, "Error", err)
 		return err

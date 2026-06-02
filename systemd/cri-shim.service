@@ -2,7 +2,9 @@
 Description=sealos cri shim
 
 [Service]
-ExecStart=/usr/bin/cri-shim --cri-socket=unix:///var/run/containerd/containerd.sock --shim-socket=/var/run/sealos/cri-shim.sock
+RuntimeDirectory=sealos
+RuntimeDirectoryMode=0755
+ExecStart=/usr/bin/cri-shim server --cri-socket=unix:///var/run/containerd/containerd.sock --shim-socket=/var/run/sealos/cri-shim.sock --global-registry-addr=<your_registry> --global-registry-user=<your_registry_username> --global-registry-password=<your_registry_password> --commit-timeout=60 --certs-dir=/etc/containerd/certs.d
 Restart=always
 StartLimitInterval=0
 RestartSec=10
@@ -15,5 +17,6 @@ LimitNOFILE=1048576
 # Comment TasksMax if your systemd version does not supports it.
 # Only systemd 226 and above support this version.
 TasksMax=infinity
+
 [Install]
 WantedBy=multi-user.target

@@ -25,6 +25,8 @@ type Config struct {
 	Trace                  bool
 	ContainerdRoot         string
 	MetricsConfig          MetricsConfig
+	CommitTimeout          int
+	CertsDir               string
 }
 
 type MetricsConfig struct {
@@ -57,5 +59,7 @@ func BindOptions(cmd *cobra.Command) *Config {
 	cmd.Flags().IntVar(&cfg.MetricsConfig.PushInterval, "metric-pushInterval", 5, "how often push samples, aka scrapeInterval at pull model")
 	cmd.Flags().StringVar(&cfg.MetricsConfig.JobName, "metric-jobName", "cri-shim", "job name for web-application")
 	cmd.Flags().StringVar(&cfg.MetricsConfig.Instance, "metric-instance", "localhost", "hostname of web-application instance")
+	cmd.Flags().IntVar(&cfg.CommitTimeout, "commit-timeout", 20, "Commit timeout in minutes")
+	cmd.Flags().StringVar(&cfg.CertsDir, "certs-dir", "/etc/containerd/certs.d", "Containerd certs directory for registry mirror configuration")
 	return cfg
 }

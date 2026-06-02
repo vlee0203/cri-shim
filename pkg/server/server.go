@@ -29,6 +29,8 @@ type Options struct {
 	ShimSocket          string
 	ContainerdNamespace string
 	ContainerdRoot      string
+	CommitTimeout       time.Duration
+	CertsDir            string
 
 	CRISocket string
 	// User is the user ID for our gRPC socket.
@@ -70,7 +72,7 @@ func New(options Options, registryOptions imageutil.RegistryOptions) (*Server, e
 		panic(err)
 	}
 
-	imageClient, err := imageutil.NewImageInterface(options.ContainerdNamespace, options.CRISocket, options.ContainerdRoot, devNull)
+	imageClient, err := imageutil.NewImageInterface(options.ContainerdNamespace, options.CRISocket, options.ContainerdRoot, options.CertsDir, devNull)
 	if err != nil {
 		return nil, err
 	}
@@ -384,7 +386,7 @@ func (s *Server) CommitContainer(task types.Task) error {
 	if status, exists := s.pool.CommitStatusMap[task.ContainerID]; exists {
 		commitFlag = types.StopCommit != status
 	}
-	ctx, _ := context.WithTimeout(context.Background(), 20*time.Minute)
+	ctx, _ := context.WithTimeout(context.Background(), s.options.CommitTimeout)
 
 	if commitFlag {
 		statusReq := &runtimeapi.ContainerStatusRequest{

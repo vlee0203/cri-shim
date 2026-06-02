@@ -42,6 +42,8 @@ func run(cfg *types.Config) {
 			ContainerdRoot:      cfg.ContainerdRoot,
 			PoolSize:            cfg.PoolSize,
 			MetricFlag:          cfg.MetricsConfig.Metric,
+			CommitTimeout:       time.Duration(cfg.CommitTimeout) * time.Minute,
+			CertsDir:            cfg.CertsDir,
 		},
 		imageutil.RegistryOptions{
 			RegistryAddr: cfg.GlobalRegistryAddr,
