@@ -26,6 +26,7 @@ type Config struct {
 	ContainerdRoot         string
 	MetricsConfig          MetricsConfig
 	CommitTimeout          int
+	LeaseTimeout           int
 	CertsDir               string
 }
 
@@ -60,6 +61,7 @@ func BindOptions(cmd *cobra.Command) *Config {
 	cmd.Flags().StringVar(&cfg.MetricsConfig.JobName, "metric-jobName", "cri-shim", "job name for web-application")
 	cmd.Flags().StringVar(&cfg.MetricsConfig.Instance, "metric-instance", "localhost", "hostname of web-application instance")
 	cmd.Flags().IntVar(&cfg.CommitTimeout, "commit-timeout", 20, "Commit timeout in minutes")
+	cmd.Flags().IntVar(&cfg.LeaseTimeout, "lease-timeout", 60, "Containerd lease timeout in minutes for container commit and image squash")
 	cmd.Flags().StringVar(&cfg.CertsDir, "certs-dir", "/etc/containerd/certs.d", "Containerd certs directory for registry mirror configuration")
 	return cfg
 }

@@ -43,6 +43,7 @@ func run(cfg *types.Config) {
 			PoolSize:            cfg.PoolSize,
 			MetricFlag:          cfg.MetricsConfig.Metric,
 			CommitTimeout:       time.Duration(cfg.CommitTimeout) * time.Minute,
+			LeaseTimeout:        time.Duration(cfg.LeaseTimeout) * time.Minute,
 			CertsDir:            cfg.CertsDir,
 		},
 		imageutil.RegistryOptions{

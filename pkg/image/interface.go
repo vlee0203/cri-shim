@@ -43,12 +43,18 @@ type imageInterfaceImpl struct {
 	Client       *client.Client
 	SquashClient *runtime.Runtime
 	CertsDir     string
+	LeaseTimeout time.Duration
 }
 
 // NewImageInterface returns a new implementation of ImageInterface
 // address: the address of the container runtime
 // writer: the io.Writer for output
-func NewImageInterface(namespace, address, root, certsDir string, fStdout *os.File) (ImageInterface, error) {
+func NewImageInterface(namespace, address, root, certsDir string, leaseTimeout time.Duration, fStdout *os.File) (ImageInterface, error) {
+	// containerd's leases.WithExpiration has no guard for d <= 0: it would set the
+	// expiration to now, leaving the commit/squash snapshots unprotected and collectable.
+	if leaseTimeout <= 0 {
+		return nil, fmt.Errorf("lease timeout must be positive, got %s", leaseTimeout)
+	}
 	global := types.GlobalCommandOptions{
 		Namespace:        namespace,
 		Address:          address,
@@ -60,6 +66,7 @@ func NewImageInterface(namespace, address, root, certsDir string, fStdout *os.Fi
 		Stdout:        fStdout,
 		FStdout:       fStdout,
 		CertsDir:      certsDir,
+		LeaseTimeout:  leaseTimeout,
 	}
 	var err error
 	if impl.Client, _, impl.Cancel, err = clientutil.NewClient(context.Background(), global.Namespace, global.Address); err != nil {
@@ -90,6 +97,14 @@ func (impl *imageInterfaceImpl) Commit(ctx context.Context, imageName, container
 		GOptions: impl.GlobalOptions,
 		Pause:    pause,
 	}
+	// nerdctl's commit hardcodes a 1h lease, which containerd's GC reclaims mid-flight for
+	// large container diffs. Pre-attaching our own lease makes nerdctl's client.WithLease a
+	// no-op (it returns early when the context already carries a lease).
+	ctx, done, err := impl.Client.WithLease(ctx, leases.WithRandomID(), leases.WithExpiration(impl.LeaseTimeout))
+	if err != nil {
+		return fmt.Errorf("failed to create lease for commit: %w", err)
+	}
+	defer done(ctx)
 	return container.Commit(ctx, impl.Client, imageName, containerID, opt)
 }
 
@@ -206,7 +221,7 @@ func (impl *imageInterfaceImpl) Squash(ctx context.Context, SourceImageRef, Targ
 		TargetImageName:  TargetImageName,
 		SquashLayerCount: 2,
 	}
-	ctx, done, err := impl.Client.WithLease(ctx, leases.WithRandomID(), leases.WithExpiration(1*time.Hour))
+	ctx, done, err := impl.Client.WithLease(ctx, leases.WithRandomID(), leases.WithExpiration(impl.LeaseTimeout))
 	if err != nil {
 		return fmt.Errorf("failed to create lease for squash: %w", err)
 	}

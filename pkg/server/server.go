@@ -30,6 +30,7 @@ type Options struct {
 	ContainerdNamespace string
 	ContainerdRoot      string
 	CommitTimeout       time.Duration
+	LeaseTimeout        time.Duration
 	CertsDir            string
 
 	CRISocket string
@@ -72,7 +73,7 @@ func New(options Options, registryOptions imageutil.RegistryOptions) (*Server, e
 		panic(err)
 	}
 
-	imageClient, err := imageutil.NewImageInterface(options.ContainerdNamespace, options.CRISocket, options.ContainerdRoot, options.CertsDir, devNull)
+	imageClient, err := imageutil.NewImageInterface(options.ContainerdNamespace, options.CRISocket, options.ContainerdRoot, options.CertsDir, options.LeaseTimeout, devNull)
 	if err != nil {
 		return nil, err
 	}
