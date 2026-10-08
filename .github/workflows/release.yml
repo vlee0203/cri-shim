@@ -3,6 +3,9 @@ name: Build and release cri-shim
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build-and-release:
     name: Build cri-shim binary and publish release
@@ -58,7 +61,7 @@ jobs:
 
       - name: Create releases
         env:
-          GH_TOKEN: ${{ secrets.GH_PAT }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG=${{ steps.tag.outputs.tag }}
 
