@@ -13,6 +13,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Generate version tag
         id: tag
@@ -34,14 +36,23 @@ jobs:
 
       - name: Generate release notes
         run: |
-          cat > release-notes.md <<EOF
-          ## Changes
+          # changes since the previous release tag; the moving 'latest' tag is not a release point
+          PREV=$(git tag --sort=-creatordate | grep -v '^latest$' | head -n1)
+          {
+            echo "## Changes"
+            echo
+            if [ -n "$PREV" ]; then
+              git log --no-merges --pretty='- %s' "refs/tags/$PREV"..HEAD
+              echo
+              echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/$PREV...${{ github.sha }}"
+              echo
+            else
+              git log --no-merges --pretty='- %s' HEAD
+              echo
+            fi
+          } > release-notes.md
 
-          - **feat**: \`--commit-timeout\` flag (default 20 min)
-          - **fix**: \`--certs-dir\` flag (default \`/etc/containerd/certs.d\`) — 修复 GetResolver 未设置 HostDir 导致 hosts.toml/harbor mirror 从未被读取的问题
-          - **ci**: GitHub Actions workflow 自动构建 amd64/arm64 二进制并发版
-          - **chore**: 更新 systemd service 文件，添加 RuntimeDirectory、新启动参数
-
+          cat >> release-notes.md <<EOF
           ## Binaries
 
           | File | Arch |
@@ -58,6 +69,8 @@ jobs:
           cri-shim server --help
           \`\`\`
           EOF
+
+          cat release-notes.md
 
       - name: Create releases
         env:
